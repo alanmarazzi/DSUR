@@ -1,0 +1,240 @@
+---
+title: "Correlation"
+output: 
+  html_notebook: 
+    code_folding: none
+    fig_height: 7
+    fig_width: 8
+    theme: readable
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.align = "center",echo = TRUE)
+```
+
+How can we measure relationships among variables?  
+
+## Covariance
+
+The simplest way to measure whether 2 variables are related is to look whether they **covary**. **Covariance** measures the deviation from the means of two variables: if they vary similarly they are correlated.  
+
+We calculate covariance like this
+
+$$
+cov(x,y)=\frac{sum{(x_i-\bar{x})(y_i-\bar{y})}}{N-1}
+$$
+
+The main issue with covariance is that it depends upon the scale of measurement, so it's not a standardized measure.  
+
+## Standardization and the Correlation Coefficient
+
+To overcome the scale of measurement issue we can use standardization. We need a unit of measurement into which every measurement can be converted. We use the *standard deviation*: if we divide any distance from the mean by the standard deviation it gives us that distance in standard deviation units.  
+
+The standardized covariance is called **correlation coefficient** and is defined as:
+
+$$
+r = \frac{cov_{xy}}{s_xs_y}=\frac{sum{(x_i-\bar{x})(y_i-\bar{y})}}{(N-1)s_xs_y}
+$$
+
+Where $s_x$ is the standard deviation and $s_y$ is the standard deviation of the second variable. The reulting coefficient is known as the **Pearson correlation coefficient**.  
+
+Notice that by standardizing the covariance we end up with a coefficient that must fall between -1 and 1.  
+
+## Bivariate Correlation
+
+There are 2 types of correlation:
+
+- **bivariate**: is a correlation between two variables
+- **partial**: looks at the correlation between 2 variables while controlling the effect of one or more additional variables
+
+To test the theory we will use the **Exam Anxiety** dataset: measure of exam performance and stress.
+
+```{r}
+examData <- read.delim("~/Downloads/Exam Anxiety.dat")
+```
+
+## Pearson's Correlation
+
+To calculate correlation we need all numeric values.
+
+```{r}
+cor(examData[,c("Exam", "Anxiety", "Revise")])
+```
+
+We don't need p-values, because correlation coefficients are effect sizes, but if we really want them we can use the `Hmisc::rcorr()` function. But before we can use it we have to convert the data to a matrix
+
+```{r}
+library(Hmisc)
+
+examMatrix <- as.matrix(examData[,c("Exam", "Anxiety", "Revise")])
+
+rcorr(examMatrix)
+```
+
+To compute confidence intervals we can use the `cor.test()` function, but we have to do it pairwise.
+
+```{r}
+cor.test(examData$Anxiety, examData$Exam)
+```
+
+What's good about these confidence intervals is that they don't cross zero, so we can be sure that the effect is really negative.  
+
+```{r}
+cor.test(examData$Anxiety, examData$Revise)
+```
+
+## R^2
+
+With $R^2$ we measure how much variability is shared by variables. To calculate it we simply square the correlation coefficient.
+
+```{r}
+cor(examData[,c("Exam", "Anxiety", "Revise")])^2
+```
+
+## Spearman's correlation coefficient
+
+**Spearman's** $r_s$ is a non-parametric statistic and can be used when the data have violated parametric assumptions. It works by first ranking the data and then applying Pearson's equation to those ranks.
+
+```{r}
+liar <- read.delim("~/Downloads/The Biggest Liar.dat")
+```
+
+```{r}
+cor(liar$Position, liar$Creativity, method = "spearman")
+```
+
+```{r}
+liarMat <- as.matrix(liar[,c("Position", "Creativity")])
+rcorr(liarMat)
+```
+
+## Kendall's tau
+
+This approach is another non-parametric method and should be used when we have small data with a large number of tied ranks.
+
+```{r}
+cor(liar$Position, liar$Creativity, method = "kendall")
+```
+
+```{r}
+cor.test(liar$Position, liar$Creativity, alternative = "less", method = "kendall")
+```
+
+## Bootstrapping 
+
+Another way to deal with data that violated assumptions is to use bootstrapping. If we want to bootstrap Kendall tau we would do
+
+```{r}
+bootTau <- function(liar, i) {
+    cor(
+        liar$Position[i], 
+        liar$Creativity[i], 
+        use = "complete.obs", 
+        method = "kendall"
+        )
+}
+```
+
+After defining the **bootTau** function we have to load the **boot** library and perform bootstrapping with that function.
+
+```{r}
+library(boot)
+boot_kendall <- boot(liar, bootTau, 2000)
+boot_kendall
+```
+
+We can also get confidence intervals
+```{r}
+boot.ci(boot_kendall)
+```
+
+## Biserial and point-biserial correlations
+
+We use these coefficients when one of the two variables is dichotomous (binary categorical). In particular, the **point-biserial correlation** is used when one variable is a discrete dichotomy (eg. dead or alive), while the **biserial correlation** is used when one variable is a continuous dichotomy (eg. passing or failing an exam).
+
+Let's say we want to test whether there is a correlation between cats' sex and the time they spend away from home.
+
+```{r}
+cats <- read.csv("~/Downloads/pbcorr.csv")
+```
+
+To perform a point biserial correlation is enough to use cor.test()
+
+```{r}
+cor.test(cats$time, cats$gender)
+```
+
+# Partial Correlation
+
+A correlation between to variables in which the effects of other variables are held constant is known as a partial correlation. To test partial correlation we will use the examData dataset.
+
+```{r}
+examData2 <- examData[,c("Exam", "Anxiety", "Revise")]
+```
+
+We will test a partial correlation between exam anxiety and exam performance while controlling for revision time.  
+
+To compute it we need the **pcor()** and **pcor.test()** functions from the *ggm* package.
+
+```{r}
+library(ggm)
+pc <- pcor(c("Exam", "Anxiety", "Revise"), var(examData2))
+pc
+pc^2
+```
+
+```{r}
+pcor.test(pc, q = 1, n = nrow(examData2))
+```
+
+# Comparing Correlations
+
+We may want to compare correlations between independent groups, for instance subsetting males and females, to do it we have to find the $z_{difference}$ by using this formula:  
+
+$$
+z_{difference} = \frac{z_r_1 - z_r_2}{\sqrt{\frac{1}{N_1 - 3}+\frac{1}{\sqrt{N_2 - 3}}}}
+$$
+
+That we can translate in a function.
+
+```{r}
+zdiff <- function(r1, r2, n1, n2) {
+    zd <- (atanh(r1) - atanh(r2)) / sqrt(1 / (n1 - 3) + 1 / (n2 - 3))
+    p <- 1 - pnorm(abs(zd))
+    print(paste("Z Difference: ", zd))
+    print(paste("One-Tailed p-value: ", p))
+}
+```
+
+Now we can compute the $z_{difference}$ by referring to this function
+
+```{r}
+zdiff(-.506, -.381, 52, 51)
+```
+
+## Comparing Dependent Correlations
+
+If we want to compare correlations that come from the same entities we can use a $t-statistic$. For instance we may want to check whether the relationship between exam anxiety (x) and exam performance (y) is stronger than the relationship between revision (z) and exam performance.  
+
+The $t_{difference}$ is computed as:  
+
+$$
+t_{difference} = (r_{xy} - r_{zy})\sqrt{\frac{(n-3)(1+r_{xz})}{2(1-r^2_{xy}-r^2_{xz}-r^2_{zy}+2r_{xy}r_{xz}r_{zy})}}
+$$
+
+As always we can translate this formula into a function
+
+```{r}
+tdiff <- function(rxy, rxz, rzy, n) {
+    df <- n - 3
+    td <- (rxy-rzy)*sqrt((df*(1+rxz))/(2*(1-rxy^2-rxz^2-rzy^2+(2*rxy*rxz*rzy))))
+    p <- pt(td, df)
+    print(paste("t Difference: ", td))
+    print(paste("One-Tailed p-value: ", p))
+}
+```
+
+```{r}
+tdiff(-.441, -.709, .397, 103)
+```
+

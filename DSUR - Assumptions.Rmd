@@ -1,0 +1,347 @@
+---
+title: "Exploring Assumptions"
+output: 
+  html_notebook: 
+    code_folding: none
+    fig_height: 7
+    fig_width: 8
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.align = "center",echo = TRUE)
+```
+
+There are 4 major assumptions to perform Parametric tests:
+
+- **Normality**: it means different things in different contexts, sometime it's the sampling distribution, other times the errors in the model
+- **Homogeneity of variance**: Variances should be the same throughout data.
+- **Interval data**: data should be measured at least at the interval level
+- **Independence**: data from different participants are independent, unless we're talking about regression where we mean that errors must be uncorrelated
+
+# Normality  
+
+In many statistical tests (like the t-test) we assume that the sampling distribution is **normally distributed**, but we don't have access to this distribution. Luckily we know from the **Central Limit Theorem** that if the sample data are approximately normal than the sampling distribution will be also.
+
+We will start by plotting data.
+
+```{r}
+# Load the Festival dataset about people's smell
+dlf <- read.delim(
+  "https://raw.githubusercontent.com/ledrui/Discovering-Statistics-Using-R/master/Chap_5/DownloadFestival.dat",
+  header = TRUE
+)
+
+library(ggplot2)
+
+# Remove outlier
+dlf$day1 <- ifelse(dlf$day1 > 20, NA, dlf$day1)
+
+# Plot data
+ggplot(dlf, aes(day1)) +
+  theme(legend.position = "none") +
+  geom_histogram(aes(y = ..density..), color = "black", fill = "white") +
+  labs(x = "Hygiene score on day 1", y = "Density")
+```
+
+We can add a normal curve to the plot with the same mean and standard deviation of the data.
+
+```{r}
+ggplot(dlf, aes(day1)) +
+  theme(legend.position = "none") +
+  geom_histogram(aes(y = ..density..), color = "black", fill = "white") +
+  labs(x = "Hygiene score on day 1", y = "Density") +
+  stat_function(
+    fun = dnorm, 
+    args = list(
+      mean = mean(dlf$day1, na.rm = TRUE), 
+      sd = sd(dlf$day1, na.rm = TRUE)
+      ),
+    color = "black",
+    size = 1
+    )
+```
+
+Repeat for the other days
+
+```{r}
+ggplot(dlf, aes(day2)) +
+  theme(legend.position = "none") +
+  geom_histogram(aes(y = ..density..), color = "black", fill = "white") +
+  labs(x = "Hygiene score on day 2", y = "Density") +
+  stat_function(
+    fun = dnorm, 
+    args = list(
+      mean = mean(dlf$day2, na.rm = TRUE),
+      sd = sd(dlf$day2, na.rm = TRUE)
+    ),
+    color = "black",
+    size = 1
+  )
+```
+
+```{r}
+ggplot(dlf, aes(day3))+
+  theme(legend.position = "none")+
+  geom_histogram(aes(y = ..density..), color = "black", fill = "white")+
+  labs(x = "Hygiene score on day 3", y = "Density")+
+  stat_function(
+    fun = dnorm,
+    args = list(
+      mean = mean(dlf$day3, na.rm = T),
+      sd = sd(dlf$day3, na.rm = T)
+    ),
+    color = "black",
+    size = 1
+  )
+```
+
+There is also another useful graph to see if adistribution is normal: the **Q-Q plot**.
+
+```{r}
+qplot(sample = dlf$day1, stat = "qq")
+```
+
+```{r}
+qplot(sample = dlf$day2, stat = "qq")
+```
+
+```{r}
+qplot(sample = dlf$day3, stat = "qq")
+```
+
+Plots for **day1** suggest that we have a nice normal distribution of observations, but the same is not true for the other days. We see that they are positively skewed, this happened because although more scores tend to cluster around the origin after a few days, some individual was able to keep their hygiene level very high.
+
+These plots already suggest that smell and time are correlated, the more time it passes, the more people will smell.
+
+## Quantifying Normality
+
+Graphs are pretty, but it is better to check for normality also with numbers. There are some useful functions that can come in help to us.
+
+`psych::describe()` and `pastecs::stat.desc()`
+
+```{r}
+library(psych)
+describe(cbind(dlf$day1, dlf$day2, dlf$day3))
+```
+
+```{r}
+library(pastecs)
+stat.desc(
+  cbind(
+    day1 = dlf$day1, 
+    day2 = dlf$day2, 
+    day3 = dlf$day3
+    ), 
+  basic = FALSE, 
+  norm = TRUE
+  )
+```
+
+We get basically the same results with these functions. We can see that on average scores went down on subsequent days. What we care about are the **skew** and **kurtosis** that should be 0 in a normal distribution. Positive values of skew indicate a pile-up of scores on the left of the distribution, while negative values indicate a pile-up on the right.  
+
+Positive kurtosis indicate a pointy and *heavy-tailed* distribution, whereas negative values indicate a flat and *light-tailed* distribution.  
+
+The further these values are from 0, the more likely it is that we don't have a normal distribution.  
+
+These values are already informative, but we can convert them to **z-scores**. A z-score is simply a score from a distribution that has mean 0 and sd = 1. After converting values to z-scores we can compare skew and kurtosis in different samples that used different measures, and and we can see how likely our values of skew and kurtosis are to occur.  
+
+To calculate a z-score we subtract the mean of the distribution (in this case 0) and then divide by the standard deviation of the distribution (in this case we use the standard error).
+
+$$
+z_{skew} = \frac{S-0}{SE_{skewness}} \\\\ z_{kurtosis} = \frac{K-0}{SE_{kurtosis}}
+$$
+
+An absolute value greater than 1.96 is significant at $p < .05$, above 2.58 is significant at $p < .01$ and above 3.29 is significant at $p < .001$. The issue is that with large sample size it is more likely that we will find values above 1.96, so the larger the sample the better it is to look for high z-scores. For very large samples it is more important to check data visually.  
+
+The `stat.desc()` function produces _**skew.2SE**_ and _**kurt.2SE**_ which are the skew and kurtosis value divided by 2 standard errors. This means that if we have values greater than $|1|$.  
+
+Above we can see that for *Hygiene scores* we have skew.2SE equal to $-0.018$, $3.612$ and $2.309$ indicating significant skew on days 2 and 3, while for kurt.2SE we have significant kurtosis on days 1 and 2, but not day 3.
+
+## Exploring Groups of Data
+
+For this example we will use the **RExam.dat** dataset which contains data regarding students' performance on an R exam. They measured 4 variables:
+- **exam**: first-year R exam scores as a percentage
+- **computer**: measure of computer literacy as a percentage
+- **lecture**: percentage of R lectures attended
+- **numeracy**: measure of numerical ability out of 15
+- **uni**: bonus, which University the student attended
+
+```{r}
+rexam <- read.delim(
+    "https://raw.githubusercontent.com/ledrui/Discovering-Statistics-Using-R/master/Chap_5/RExam.dat",
+    header = TRUE)
+```
+
+First we have to encode the **uni** variable as factor
+
+```{r}
+rexam$uni <- factor(
+    rexam$uni, 
+    levels = c(0:1), 
+    labels = c("Duncetown University", "Sussex University")
+    )
+```
+
+Let's define a function to plot density and relative theoric normal density!
+
+```{r}
+dens <- function(df, variable) {
+    ggplot(df, aes(variable))+
+    geom_density(fill = "white", color = "black", alpha = .5)+
+    stat_function(
+        fun = dnorm, 
+        args = list(
+            mean = mean(variable, na.rm = TRUE),
+            sd = sd(variable, na.rm = TRUE)
+        ),
+        color = "red",
+        size = 1
+    )
+}
+
+dens(rexam, rexam$exam)
+```
+
+```{r}
+dens(rexam, rexam$computer)
+```
+
+```{r}
+dens(rexam, rexam$lectures)
+```
+
+```{r}
+dens(rexam, rexam$numeracy)
+```
+
+```{r}
+stat.desc(
+    cbind(
+        exam = rexam$exam,
+        computer = rexam$computer,
+        lectures = rexam$lectures,
+        numeracy = rexam$numeracy
+    ),
+    desc = FALSE,
+    norm = TRUE
+)
+```
+
+If we want to split data by group, let's say by the **uni** variable, we can use the `by()` function.
+
+```{r}
+by(rexam$exam, INDICES = rexam$uni, FUN = stat.desc, basic = FALSE, norm = TRUE)
+```
+
+Of course we can also split the plots by **uni**
+
+```{r}
+uni <- rexam %>% filter(uni == "Duncetown University")
+dens(uni, uni$exam)
+```
+
+## Testing Normality 
+
+Another way to look at the issue is to see whether the distribution as a whole deviates from a comparable normal distribution. The **Shapiro-Wilk** test does just this: it compares the scorse in the sample to a normally distributed set of scores.  
+
+If the test is non-significant (p > .05) it tells us that the distribution of the sample is not different from a normal distribution. The same issues about sample sizes hold true even for this test.  
+
+The `stat.desc()` function already calculates the **Shapiro-Wilk** test, but we can do it as well with the `shapiro.test()` function.
+
+```{r}
+shapiro.test(rexam$exam)
+```
+
+As expected the result is a significant deviation from normality, but also remember the bimodal distribution of the variables. We can use the by() function to split data and perform the test.
+
+```{r}
+by(rexam$exam, rexam$uni, shapiro.test)
+```
+
+Now it's clear that we actually have normal distributions!
+
+Let's go further and draw Q-Q plots
+
+```{r}
+qplot(sample = rexam$exam, stat = "qq")
+```
+
+```{r}
+qplot(sample = rexam$numeracy, stat = "qq")
+```
+
+If we split the data, we will get much nicer Q-Q plots
+
+```{r}
+qplot(sample = uni$exam, stat = "qq")
+```
+
+# Homogeneity of Variance
+
+Another assumption is **homogeneity of variance**, meaning that variance through levels of one variable shouldn't change vs the other variable. It's easier to understand with an example.  
+
+## Levene's Test
+
+This test works by doing one-way **ANOVA** on the deviation scores and is significant at $p <= .05$. We can use the leveneTest() function from the *car* package. To use this function we have to enter the outcome variable and then the grouping variable which must be a factor. As default the levenetest() will center data around the median, but we can override it.
+
+```{r}
+library(car)
+leveneTest(rexam$exam, rexam$uni)
+```
+
+```{r}
+leveneTest(rexam$numeracy, rexam$uni)
+```
+
+The test for exam scores is not significant, meaning that we have the same variance along factor levels, while for numeracy the test is significant.
+
+# Dealing with non-normality and unequal variances
+
+What can we do when we issues with data? There are different techniques, mostly by transforming data. To deal with non-normality we have a few options, let's see what we can do with the **Download Festival** data (recall that data was not normal on day 2 and 3).  
+
+The usual techniques are:
+
+- **Log transformation**: the log squashes the right tail of the distribution, so it is a good way to correct positive skew. Just remember that we can't take the log of 0.
+- **Square root**: this reduces positive skew, like the log, but remember we can't take the root of negative numbers.
+- **Reciprocal transformation**: dividing 1 by each score also reduces positive skew, but bear in mind that $1/x$ will reverse the scores: large numbers will tend to 0 and viceversa. We can avoid this problem reversing the scores before the transformation: $1/(x_{highest} - x_i)$.
+- **Reverse score**: any previous transformation can be used to correct negative skew, but before applying it we have to reverse the scores. 
+
+## Log transformation
+
+Let's reduce the skew of Download Festival.
+
+```{r}
+dlf$logday1 <- log(dlf$day1 + 1) # add 1 because in day2 there is a 0
+dlf$logday2 <- log(dlf$day2 + 1)
+dlf$logday3 <- log(dlf$day3 + 1)
+```
+
+## Square root transformation
+
+```{r}
+dlf$sqrtday1 <- sqrt(dlf$day1)
+dlf$sqrtday2 <- sqrt(dlf$day2)
+dlf$sqrtday3 <- sqrt(dlf$day3)
+```
+
+## Reciprocal Transformation
+
+```{r}
+dlf$recday1 <- 1/(dlf$day1 + 1) # there's always that 0 in day2
+```
+
+# Robust Methods
+
+What if transformations don't solve the problem? We can use robust methods.  
+
+Many of these procedures use a **trimmed mean** which is a mean based on the distribution of scores after some percentage of scores has been removed from each extreme. So, a 10% trimmed mean will remove 10% of scores from the top and bottom before the mean is calculated. Another similar method is an **M-estimator** which differs from the trimmed mean in that the amount of trimming is determined empirically.  
+
+The second method is the **bootstrap**. Bootstrapping estimates the properties of the sampling distribution from the sample data. The sample data are treated as a population from which smaller samples are taken, the statistic of interest is calculated in each sample.  
+
+The good thing is that we can access robust methods directly through Wilcox's functions.
+
+```{r}
+library(WRS)
+```
+
