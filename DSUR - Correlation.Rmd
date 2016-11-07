@@ -237,4 +237,3 @@ tdiff <- function(rxy, rxz, rzy, n) {
 ```{r}
 tdiff(-.441, -.709, .397, 103)
 ```
-
