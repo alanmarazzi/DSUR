@@ -1,0 +1,97 @@
+---
+title: "DSUR - Regression"
+output: 
+  html_notebook: 
+    code_folding: none
+    fig_height: 7
+    fig_width: 8
+    theme: readable
+---
+
+Regression is one of the most powerful statistical techniques we can use.
+
+First load libraries
+
+```{r}
+library(boot)
+library(car)
+library(QuantPsyc)
+```
+
+Load data
+
+```{r}
+album1 <- read.delim("https://studysites.sagepub.com/dsur/study/DSUR%20Data%20Files/Chapter%207/Album%20Sales%201.dat",
+                     header = TRUE)
+summary(album1)
+```
+
+# Linear Regression
+
+Now we will perform a linear regression predicting Album sales according to advertising expense
+
+```{r}
+albumSales_1 <- lm(sales ~ adverts, data = album1)
+summary(albumSales_1)
+```
+
+The output tells us that $R^2$ is $.3346$ which means that **advertising** accounts for about 33% of the variability in **sales**. If we take the square root of $R^2$ we will get the Pearson correlation:
+
+```{r}
+sqrt(.3346)
+```
+
+The **F-value** indicates the $F$-ratio, in this case $F = 99.59$ is significant at $p < .001$ which means that there is way less than 0.1% chance that an F value so large would happen by chance. We can conclude that our model predicts album sales significantly better than using the mean.
+
+Our coefficients are significant as well, so we can now use the model to predict album sales.
+
+## Using the model
+
+Our model is simply:
+
+$$
+album\ sales = b_0+b_1advertising\ budget = \\
+       = 134.14 + (0.096 * advertising\ budget)
+$$
+
+So let's say that an executive wants to spend £100,000 on advertising a new album. Our units are already in thousands, so we just have to put 100 in our above equation.
+
+$$
+album\ sales = 134.14 + (0.096 * advertising\ budget) = \\
+= 134.14 + (0.096 * 100) = \\
+= 143.74
+$$
+
+# Multiple Regression
+
+Our executive is not happy about our model and wants to extend it by accounting for other variables, he wants to see what happens to sales when measuring the number of times an album is played on Radio 1 ($airplay$) the week prior to release.  
+
+In this way our model will become:
+
+$$
+album\ sales = b_0 + b_1advertising\ budget + b_2airplay
+$$
+
+Before launching a model to the new data it's better to understand what happens when we use a multiple regression.  
+
+$R^2$ is no longer significant, we have to look at Multiple $R^2$, but the issue is that this value will always increase when adding variables to the model. To compare models with multiple predictors we may use **Akaike information criterion (AIC)**, which is a measure of fit that penalizes model complexity (aka more variables).  
+
+**AIC** is defined as:
+
+$$
+AIC = n\ln{\frac{SSE}{n}+2k}
+$$
+
+$n$ is the number of cases in the model, $ln$ is the natural logarithm, $SSE$ is the sum of square errors and $k$ is the number of predictors. Of course, because of the $2k$ larger AIC means a worst fit.  
+
+## Other Diagnostics
+
+### Outliers and Residuals
+
+
+
+```{r}
+library(scatterplot3d)
+s3d <- with()
+```
+
