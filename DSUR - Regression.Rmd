@@ -1,7 +1,10 @@
 ---
 title: "DSUR - Regression"
-output: 
-  html_notebook: 
+output:
+  md_document: 
+    fig_height: 7
+    fig_width: 8
+  html_notebook:
     code_folding: none
     fig_height: 7
     fig_width: 8
@@ -21,14 +24,14 @@ library(QuantPsyc)
 Load data
 
 ```{r}
-album1 <- read.delim("https://studysites.sagepub.com/dsur/study/DSUR%20Data%20Files/Chapter%207/Album%20Sales%201.dat",
+album1 <- read.delim("https://studysites.uk.sagepub.com/dsur/study/DSUR%20Data%20Files/Chapter%207/Album%20Sales%202.dat",
                      header = TRUE)
 summary(album1)
 ```
 
 # Linear Regression
 
-Now we will perform a linear regression predicting Album sales according to advertising expense
+Now we will perform a linear regression predicting Album sales according to advertising expenses
 
 ```{r}
 albumSales_1 <- lm(sales ~ adverts, data = album1)
@@ -84,14 +87,4 @@ $$
 
 $n$ is the number of cases in the model, $ln$ is the natural logarithm, $SSE$ is the sum of square errors and $k$ is the number of predictors. Of course, because of the $2k$ larger AIC means a worst fit.  
 
-## Other Diagnostics
-
-### Outliers and Residuals
-
-
-
-```{r}
-library(scatterplot3d)
-s3d <- with()
-```
 
